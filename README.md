@@ -66,3 +66,15 @@ streamlit run app.py
 
 ## ⚠️ 참고 사항
 본 프로젝트는 가상 데이터를 활용한 교육 및 실험용 프로토타입이며, 실제 산업 현장의 안전 인증이나 위험성 평가를 대체하지 않습니다.
+
+<!-- 
+
+generate_data.py — 가상 안전 데이터 생성
+train_model.py — 머신러닝 모델 학습
+models/ — 학습된 모델 저장
+agent.py — AI 안전 분석
+app.py — Streamlit 대시보드와 분석 이력 관리
+safebot.db — 분석 기록 저장
+README.md, requirements.txt — 프로젝트 설명 및 설치 환경
+
+>
