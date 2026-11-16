@@ -123,8 +123,14 @@ def load_model():
     return joblib.load(MODEL_PATH)
 
 
+
 def make_pdf_report(record):
-    """선택한 분석 기록을 한글 PDF 보고서로 생성."""
+    """선택한 분석 기록을 보기 좋은 한글 PDF 보고서로 생성."""
+    import re
+    import io
+
+    from xml.sax.saxutils import escape
+
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_LEFT, TA_CENTER
     from reportlab.lib.pagesizes import A4
@@ -132,15 +138,33 @@ def make_pdf_report(record):
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.cidfonts import UnicodeCIDFont
     from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        SimpleDocTemplate,
+        Paragraph,
+        Spacer,
+        Table,
+        TableStyle
     )
-    from xml.sax.saxutils import escape
 
     buffer = io.BytesIO()
 
-    # ReportLab 내장 한국어 CID 글꼴
+    # --------------------------------------
+    # 1. 한글 글꼴 설정
+    # --------------------------------------
+
     font_name = "HYSMyeongJo-Medium"
     pdfmetrics.registerFont(UnicodeCIDFont(font_name))
+
+    pdfmetrics.registerFontFamily(
+        font_name,
+        normal=font_name,
+        bold=font_name,
+        italic=font_name,
+        boldItalic=font_name
+    )
+
+    # --------------------------------------
+    # 2. PDF 페이지 설정
+    # --------------------------------------
 
     doc = SimpleDocTemplate(
         buffer,
@@ -152,34 +176,142 @@ def make_pdf_report(record):
     )
 
     styles = getSampleStyleSheet()
+
     title_style = ParagraphStyle(
-        "KoreanTitle",
+        "SafeBotTitle",
         parent=styles["Title"],
         fontName=font_name,
-        fontSize=19,
-        leading=26,
+        fontSize=20,
+        leading=28,
         alignment=TA_CENTER,
-        textColor=colors.HexColor("#20252B"),
-        spaceAfter=16
+        textColor=colors.HexColor("#172B4D"),
+        spaceAfter=18
     )
+
     heading_style = ParagraphStyle(
-        "KoreanHeading",
+        "SafeBotHeading",
         parent=styles["Heading2"],
         fontName=font_name,
         fontSize=12,
         leading=18,
-        textColor=colors.HexColor("#263746"),
-        spaceBefore=12,
-        spaceAfter=7
+        textColor=colors.HexColor("#176B50"),
+        spaceBefore=14,
+        spaceAfter=8,
+        keepWithNext=True
     )
+
+    subheading_style = ParagraphStyle(
+        "SafeBotSubHeading",
+        parent=styles["Heading3"],
+        fontName=font_name,
+        fontSize=10,
+        leading=15,
+        textColor=colors.HexColor("#263746"),
+        spaceBefore=9,
+        spaceAfter=5,
+        keepWithNext=True
+    )
+
     body_style = ParagraphStyle(
-        "KoreanBody",
+        "SafeBotBody",
         parent=styles["BodyText"],
         fontName=font_name,
         fontSize=9,
-        leading=14,
-        alignment=TA_LEFT
+        leading=15,
+        alignment=TA_LEFT,
+        spaceAfter=5,
+        wordWrap="CJK"
     )
+
+    bullet_style = ParagraphStyle(
+        "SafeBotBullet",
+        parent=body_style,
+        leftIndent=14,
+        firstLineIndent=-10,
+        spaceAfter=5
+    )
+
+    # --------------------------------------
+    # 3. Markdown 변환 함수
+    # --------------------------------------
+
+    def convert_inline_markdown(text):
+        """굵은 글씨 등 인라인 Markdown 변환."""
+        text = escape(text)
+
+        # **강조 문구** -> 굵은 글씨
+        text = re.sub(
+            r"\*\*(.+?)\*\*",
+            r"<b>\1</b>",
+            text
+        )
+
+        # *기울임 문구* -> 기울임 글씨
+        text = re.sub(
+            r"(?<!\*)\*([^*]+?)\*(?!\*)",
+            r"<i>\1</i>",
+            text
+        )
+
+        return text
+
+    def convert_markdown_to_story(markdown_text):
+        """Markdown 제목, 목록, 문단을 PDF 요소로 변환."""
+        elements = []
+        lines = str(markdown_text).splitlines()
+
+        for line in lines:
+            line = line.strip()
+
+            if not line:
+                elements.append(Spacer(1, 4))
+                continue
+
+            # Markdown 제목 변환
+            heading_match = re.match(r"^(#{1,4})\s+(.+)$", line)
+
+            if heading_match:
+                level = len(heading_match.group(1))
+                heading_text = convert_inline_markdown(
+                    heading_match.group(2)
+                )
+
+                if level <= 2:
+                    elements.append(
+                        Paragraph(heading_text, heading_style)
+                    )
+                else:
+                    elements.append(
+                        Paragraph(heading_text, subheading_style)
+                    )
+
+                continue
+
+            # 글머리 기호 변환
+            if re.match(r"^[-*+]\s+", line):
+                bullet_text = re.sub(r"^[-*+]\s+", "", line)
+                bullet_text = convert_inline_markdown(bullet_text)
+
+                elements.append(
+                    Paragraph(
+                        "• " + bullet_text,
+                        bullet_style
+                    )
+                )
+                continue
+
+            # 일반 문단
+            paragraph_text = convert_inline_markdown(line)
+
+            elements.append(
+                Paragraph(paragraph_text, body_style)
+            )
+
+        return elements
+
+    # --------------------------------------
+    # 4. 위험도 및 기본 정보
+    # --------------------------------------
 
     risk_text = RISK_LABELS.get(
         str(record["risk_level"]),
@@ -187,59 +319,143 @@ def make_pdf_report(record):
     )
 
     story = [
-        Paragraph("SafeBot 로봇 안전 분석 보고서", title_style),
+        Paragraph(
+            "SafeBot 로봇 안전 분석 보고서",
+            title_style
+        ),
+
         Paragraph(
             f"분석 ID: {int(record['id'])}　|　"
             f"분석 시간: {escape(str(record['analysis_time']))}",
             body_style
         ),
-        Spacer(1, 12),
-        Paragraph("1. 머신러닝 위험도 예측", heading_style),
-        Paragraph(f"예측 결과: <b>{escape(risk_text)}</b>", body_style),
-        Paragraph("2. 작업 환경 입력값", heading_style),
+
+        Spacer(1, 14),
+
+        Paragraph(
+            "1. 머신러닝 위험도 예측",
+            heading_style
+        ),
+
+        Paragraph(
+            f"예측 결과: <b>{escape(risk_text)}</b>",
+            body_style
+        ),
+
+        Paragraph(
+            "2. 작업 환경 입력값",
+            heading_style
+        )
     ]
+
+    # --------------------------------------
+    # 5. 입력 데이터 표
+    # --------------------------------------
 
     rows = [
         ["항목", "분석값"],
-        ["로봇 이동 속도", f"{float(record['robot_speed']):.2f} m/s"],
-        ["작업자와의 거리", f"{float(record['human_distance']):.2f} m"],
-        ["장애물 감지", "감지됨" if int(record["obstacle_detected"]) else "감지 안 됨"],
-        ["작업 공간 혼잡도", f"{int(record['workspace_congestion'])} / 5"],
-        ["비상 정지 기능", "활성화" if int(record["emergency_stop"]) else "비활성화"],
+        [
+            "로봇 이동 속도",
+            f"{float(record['robot_speed']):.2f} m/s"
+        ],
+        [
+            "작업자와의 거리",
+            f"{float(record['human_distance']):.2f} m"
+        ],
+        [
+            "장애물 감지",
+            "감지됨"
+            if int(record["obstacle_detected"])
+            else "감지 안 됨"
+        ],
+        [
+            "작업 공간 혼잡도",
+            f"{int(record['workspace_congestion'])} / 5"
+        ],
+        [
+            "비상 정지 기능",
+            "활성화"
+            if int(record["emergency_stop"])
+            else "비활성화"
+        ]
     ]
 
-    table = Table(rows, colWidths=[150, 300], repeatRows=1)
+    table = Table(
+        rows,
+        colWidths=[150, 300],
+        repeatRows=1
+    )
+
     table.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), font_name),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EDF2")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#17212B")),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#C8D0D8")),
+        ("BACKGROUND", (0, 0), (-1, 0),
+         colors.HexColor("#E8EDF2")),
+        ("TEXTCOLOR", (0, 0), (-1, 0),
+         colors.HexColor("#17212B")),
+        ("GRID", (0, 0), (-1, -1),
+         0.5, colors.HexColor("#C8D0D8")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
     ]))
-    story.extend([table, Paragraph("3. AI 안전 분석 결과", heading_style)])
+
+    story.extend([
+        table,
+        Spacer(1, 8),
+        Paragraph(
+            "3. AI 안전 분석 결과",
+            heading_style
+        )
+    ])
+
+    # --------------------------------------
+    # 6. AI 분석 결과 Markdown 변환
+    # --------------------------------------
 
     advice = record.get("ai_advice")
+
     if pd.isna(advice) or not str(advice).strip():
         advice_text = "저장된 AI 분석 결과가 없습니다."
-    else:
-        # PDF에서는 Markdown 기호를 제거하지 않고 텍스트로 안전하게 표시
-        advice_text = escape(str(advice)).replace("\n", "<br/>")
 
-    story.append(Paragraph(advice_text, body_style))
+        story.append(
+            Paragraph(advice_text, body_style)
+        )
+    else:
+        story.extend(
+            convert_markdown_to_story(advice)
+        )
+
+    # --------------------------------------
+    # 7. 안내 문구
+    # --------------------------------------
+
     story.extend([
         Spacer(1, 18),
+
+        Paragraph(
+            "<b>안내 사항</b>",
+            subheading_style
+        ),
+
         Paragraph(
             "본 보고서는 SafeBot 교육용 프로토타입의 분석 결과입니다. "
-            "실제 산업 현장의 안전 인증이나 위험성 평가를 대체하지 않습니다.",
+            "가상 데이터와 머신러닝 예측을 기반으로 하며, "
+            "실제 산업 현장의 안전 인증이나 전문적인 위험성 평가를 "
+            "대체하지 않습니다.",
             body_style
         )
     ])
 
+    # --------------------------------------
+    # 8. PDF 생성
+    # --------------------------------------
+
     doc.build(story)
+
     buffer.seek(0)
+
     return buffer.getvalue()
 
 
