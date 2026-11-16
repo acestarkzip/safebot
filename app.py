@@ -127,7 +127,7 @@ if history:
             "분석 건수": risk_counts,
             "비율(%)": risk_percent
         }),
-        use_container_width=True
+        width="stretch"
     )
 
     # 분석 이력
@@ -135,9 +135,9 @@ if history:
 
     st.dataframe(
         history_df.tail(10).iloc[::-1],
-        use_container_width=True
+        width="stretch"
     )
-    
+
     # CSV 다운로드
     st.subheader("📥 분석 기록 다운로드")
 
