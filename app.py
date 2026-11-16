@@ -137,6 +137,20 @@ if history:
         history_df.tail(10).iloc[::-1],
         use_container_width=True
     )
+    
+    # CSV 다운로드
+    st.subheader("📥 분석 기록 다운로드")
+
+    csv = history_df.to_csv(
+        index=False
+    ).encode("utf-8-sig")
+
+    st.download_button(
+        label="분석 이력 CSV 다운로드",
+        data=csv,
+        file_name="safebot_analysis_history.csv",
+        mime="text/csv"
+    )
 
 else:
     st.info("아직 분석 기록이 없습니다. 위험도 분석을 실행해주세요.")
