@@ -30,7 +30,7 @@ def analyze_safety(risk_level, robot_data):
     """
 
     response = client.responses.create(
-        model="gpt-5.5",
+        model="gpt-4o-mini",
         input=prompt
     )
 
