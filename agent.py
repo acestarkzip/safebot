@@ -51,8 +51,6 @@ def analyze_safety(risk_level, robot_data):
 - 비상 정지 기능: {emergency_text}
 
 [중요한 해석 기준]
-
-[중요한 해석 기준]
 1. emergency_stop = 1은 비상 정지 기능이 활성화된 상태입니다.
 2. emergency_stop = 0은 비상 정지 기능이 비활성화된 상태입니다.
 3. 비상 정지 기능의 활성화 여부만으로 실제 비상 정지 작동 횟수나 빈도를 추측하지 마세요.
