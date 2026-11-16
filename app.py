@@ -15,6 +15,10 @@ st.set_page_config(
 st.title("🤖 SafeBot")
 st.subheader("AI 기반 로봇 안전 위험도 분석")
 
+# 분석 이력 초기화
+if "analysis_history" not in st.session_state:
+    st.session_state.analysis_history = []
+
 # 머신러닝 모델 불러오기
 model = joblib.load("models/risk_model.pkl")
 
@@ -41,6 +45,13 @@ if st.button("위험도 분석하기"):
     # 머신러닝 예측
     result = model.predict(input_data)[0]
 
+    # 분석 이력 저장
+    st.session_state.analysis_history.append({
+        "robot_speed": speed,
+        "human_distance": distance,
+        "risk_level": result
+    })
+
     st.header("📊 머신러닝 분석 결과")
 
     if result == "Low":
@@ -66,6 +77,69 @@ if st.button("위험도 분석하기"):
 
         except Exception as e:
             st.error(f"AI 분석 오류: {e}")
+
+# 위험도 통계 대시보드
+st.divider()
+st.header("📈 위험도 분석 통계")
+
+history = st.session_state.analysis_history
+
+if history:
+
+    history_df = pd.DataFrame(history)
+
+    # 위험 등급별 건수
+    risk_counts = (
+        history_df["risk_level"]
+        .value_counts()
+        .reindex(["Low", "Medium", "High"], fill_value=0)
+    )
+
+    total = len(history_df)
+
+    # 전체 분석 건수
+    st.metric("총 분석 건수", f"{total}건")
+
+    # 위험 등급별 통계
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("낮은 위험도", f"{risk_counts['Low']}건")
+
+    with col2:
+        st.metric("중간 위험도", f"{risk_counts['Medium']}건")
+
+    with col3:
+        st.metric("높은 위험도", f"{risk_counts['High']}건")
+
+    # 위험도 차트
+    st.subheader("위험 등급별 분석 현황")
+
+    st.bar_chart(risk_counts)
+
+    # 위험도 비율
+    st.subheader("위험 등급별 비율")
+
+    risk_percent = (risk_counts / total * 100).round(1)
+
+    st.dataframe(
+        pd.DataFrame({
+            "분석 건수": risk_counts,
+            "비율(%)": risk_percent
+        }),
+        use_container_width=True
+    )
+
+    # 분석 이력
+    st.subheader("최근 분석 이력")
+
+    st.dataframe(
+        history_df.tail(10).iloc[::-1],
+        use_container_width=True
+    )
+
+else:
+    st.info("아직 분석 기록이 없습니다. 위험도 분석을 실행해주세요.")
 
 st.divider()
 
