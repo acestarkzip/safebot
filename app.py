@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import joblib
+from agent import analyze_safety
 
 # 페이지 설정
 st.set_page_config(
@@ -36,13 +37,23 @@ if st.button("위험도 분석하기"):
 
     result = model.predict(input_data)[0]
 
-    st.write("### 분석 결과")
+st.write("### 분석 결과")
 
-    if result == "Low":
-        st.success("낮은 위험도")
-    elif result == "Medium":
-        st.warning("중간 위험도")
-    else:
-        st.error("높은 위험도")
+if result == "Low":
+    st.success("낮은 위험도")
+elif result == "Medium":
+    st.warning("중간 위험도")
+else:
+    st.error("높은 위험도")
 
-    st.write(f"예측 결과: **{result}**")
+st.write(f"예측 결과: **{result}**")
+
+# AI Agent 분석
+st.write("### 🤖 AI 안전 분석")
+
+with st.spinner("AI가 안전 개선 방안을 분석하고 있습니다..."):
+    try:
+        advice = analyze_safety(result, input_data.iloc[0].to_dict())
+        st.markdown(advice)
+    except Exception as e:
+        st.error(f"AI 분석 오류: {e}")
