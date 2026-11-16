@@ -1,3 +1,4 @@
+
 # Data Processing
 numpy
 pandas
@@ -12,3 +13,6 @@ streamlit
 # AI Agent API
 openai
 python-dotenv
+
+# PDF Report
+reportlab
