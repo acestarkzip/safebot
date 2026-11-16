@@ -1,0 +1,14 @@
+# Data Processing
+numpy
+pandas
+
+# Machine Learning
+scikit-learn
+joblib
+
+# Web Application
+streamlit
+
+# AI Agent API
+openai
+python-dotenv
